@@ -1,125 +1,282 @@
-# Aula 7 — Protocolos TCP e UDP com Python
+# Aula 7 — Criando servidores e clientes TCP e UDP com Python
 
-**Tutorial para os alunos — Blocos 4 e 5.** Leia e siga **na ordem**, em duplas. Você não precisa conhecer Python previamente. Tudo funciona com a biblioteca padrão do Python, sem instalar pacotes.
+Este é um **tutorial para seguir diretamente no VS Code**. Você não precisa baixar os arquivos Python prontos: **vai criar os arquivos, copiar os blocos de código e modificar os mesmos programas** conforme avança. Os quatro arquivos disponíveis neste GitHub servem apenas como referência do **Bloco 4**.
 
-> **Objetivo:** criar uma comunicação real entre dois notebooks no mesmo Wi-Fi, descobrir por que ela falha, medir desempenho e programar recuperação de mensagens UDP.
+## Antes de começar — preparação
 
-## Antes de começar
+**Dividam-se em duplas.** O notebook A será o **servidor** e o notebook B será o **cliente**. Os dois devem estar no mesmo Wi-Fi. Ao final, troquem os papéis.
 
-**O que é um socket?** É a interface usada pelo programa para trocar dados pela rede. Pense no **IP** como o endereço do computador e na **porta** como o número da aplicação. Nosso servidor TCP usará a porta **5000** e o UDP, **5001**.
+1. Abra o **VS Code**. Em seu computador, crie uma pasta chamada **`Servidor-Cliente-Python`**.
+2. No VS Code, clique em **File → Open Folder** e abra essa pasta.
+3. Em **Terminal → New Terminal**, digite `python --version`. Se não funcionar, tente `py --version`. É necessário ter o Python instalado.
+4. No notebook do **servidor**, execute `ipconfig` e procure o **Endereço IPv4** do adaptador Wi-Fi. Anote-o, por exemplo `192.168.1.10`.
+5. Nos arquivos dos clientes, substitua `192.168.1.10` pelo IP real do notebook servidor. Se ambos os programas forem executados no mesmo computador, use `127.0.0.1`.
 
-| TCP | UDP |
-| --- | --- |
-| Estabelece conexão antes de enviar dados | Envia datagramas sem conexão prévia |
-| Entrega os bytes em ordem enquanto a conexão funciona | Não garante chegada nem ordem dos datagramas |
-| Usamos `listen()`, `accept()`, `connect()` | Usamos `sendto()` e `recvfrom()` |
-| Ex.: acesso web HTTPS, SSH | Ex.: jogos em tempo real, DNS tradicional |
+**Conheça as funções:** `socket()` cria o socket; `bind()` define IP/porta locais; `listen()` prepara a espera por conexões TCP; `accept()` aceita um cliente; `connect()` inicia a conexão TCP; `sendall()` envia bytes pelo TCP; `recvfrom()` e `sendto()` recebem e enviam datagramas UDP. O `while True` mantém o programa em funcionamento até sair do laço.
 
-UDP não é sempre mais rápido: depende da aplicação e da rede.
-
-### 1. Prepare os notebooks
-
-1. Conectem os **dois notebooks ao mesmo Wi-Fi**. Um será o **servidor (A)** e outro o **cliente (B)**.
-2. Instalem o Python e o VS Code se necessário. No terminal do VS Code, confirmem com `python --version` (ou `py --version`).
-3. Cliquem no botão **Code → Download ZIP** nesta página. Extraiam o ZIP e abram a pasta no VS Code. Cada computador pode baixar os mesmos quatro arquivos.
-4. No notebook A, abram um terminal (`Terminal → New Terminal`) e executem `ipconfig`. Procurem o **Endereço IPv4** do adaptador **Wi-Fi** (exemplo: `192.168.1.10`).
-5. No notebook B, abram `cliente_tcp.py` e `cliente_udp.py` e **substituam** o exemplo `IP_SERVIDOR = "192.168.1.10"` pelo IPv4 do notebook A. **Não usem o IP do gateway**.
-6. Caso a escola isole os notebooks na rede, executem os dois programas no **mesmo notebook** e usem `IP_SERVIDOR = "127.0.0.1"` nos clientes. É o *localhost*.
-
-**Importante:** `0.0.0.0` aparece apenas nos **servidores** para escutar nas interfaces IPv4; **não** deve ser o destino do cliente.
+> **Como usar este tutorial:** todos os blocos Python têm **código completo, com indentação**. Nos passos de atualização, observe os comentários `# NOVO - BLOCO 5` e **substitua o conteúdo inteiro do arquivo** pelo bloco logo abaixo de **"Ficando assim o código:"**. Dessa maneira, você não precisa adivinhar onde colocar cada linha.
 
 ---
 
-# BLOCO 4 — Construindo a comunicação
+# Bloco 4 — Comunicação TCP e UDP
 
-## 2. TCP: servidor
+## Passo 1 — Criar servidor TCP
 
-No notebook A, abram [servidor_tcp.py](servidor_tcp.py). Leiam os comentários do código, especialmente:
+1. Na pasta `Servidor-Cliente-Python`, clique em **New File**.
+2. Nomeie o arquivo exatamente **`servidor-tcp.py`**.
+3. Copie **todo** o código abaixo e cole nele:
 
-- `socket(AF_INET, SOCK_STREAM)`: cria o socket IPv4/TCP.
-- `bind(("0.0.0.0", 5000))`: associa o socket à porta local **5000**.
-- `listen()`: coloca o servidor à espera.
-- `accept()`: aguarda um cliente e devolve uma conexão para conversar.
-- `readline()`: recebe uma mensagem terminada em quebra de linha. **TCP transporta um fluxo de bytes**, não mensagens individuais.
-- `sendall()`: envia os bytes de resposta.
-- Os dois `while True`: o externo aceita novos clientes, o interno mantém o chat com um cliente. Este exemplo atende **um cliente por vez**.
-- `Ctrl+C`: encerra o servidor.
+```python
+"""Bloco 4: servidor TCP com chat contínuo. Execute: python servidor-tcp.py"""
+import socket
 
-No terminal do notebook A:
+HOST = "0.0.0.0"  # Ouve em todas as interfaces IPv4 do notebook
+PORTA = 5000
+
+# socket(): cria um socket IPv4 (AF_INET) usando TCP (SOCK_STREAM).
+servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+# bind(): associa o socket ao IP local e à porta 5000.
+servidor.bind((HOST, PORTA))
+
+# listen(): começa a aguardar pedidos de conexão TCP.
+servidor.listen()
+print(f"Servidor TCP ativo na porta {PORTA}. Ctrl+C para encerrar.")
+
+try:
+    while True:  # Mantém o servidor disponível para novos clientes.
+        print("\nAguardando cliente...")
+        # accept(): espera um cliente e devolve conexão + endereço remoto.
+        conexao, endereco = servidor.accept()
+        print("Cliente conectado:", endereco)
+
+        try:
+            with conexao:
+                # makefile lê mensagens terminadas em \n; TCP é fluxo de bytes.
+                entrada = conexao.makefile("r", encoding="utf-8")
+                with entrada:
+                    while True:  # Mantém o chat com o cliente atual.
+                        linha = entrada.readline()
+                        if not linha:  # Cliente fechou a conexão.
+                            break
+                        mensagem = linha.rstrip("\r\n")
+                        print(f"Cliente {endereco[0]}: {mensagem}")
+
+                        # sendall(): envia todos os bytes de uma resposta.
+                        resposta = f"Servidor recebeu: {mensagem}\n"
+                        conexao.sendall(resposta.encode("utf-8"))
+        except OSError as erro:
+            print("Erro na conversa:", erro)
+        print("Cliente desconectado.")
+
+except KeyboardInterrupt:
+    print("\nServidor encerrado por Ctrl+C.")
+finally:
+    servidor.close()  # close(): libera o socket.
+```
+
+**Entenda o código:** `AF_INET` significa IPv4; `SOCK_STREAM` significa TCP; `0.0.0.0` permite receber conexões por interfaces IPv4 locais; `5000` é a porta; `listen()` aguarda; `accept()` aceita a conexão; `sendall()` devolve a resposta. O servidor atende um cliente por vez, mas continua aberto esperando o próximo.
+
+**Executar:** no notebook A, no terminal da pasta, digite:
 
 ```powershell
-python servidor_tcp.py
+python servidor-tcp.py
 ```
 
-Resultado esperado:
+**Resultado esperado:** `Servidor TCP ativo na porta 5000` e `Aguardando cliente...`. **Deixe o terminal aberto.**
 
-```text
-Servidor TCP ativo na porta 5000. Ctrl+C para encerrar.
-Aguardando cliente...
+## Passo 2 — Criar cliente TCP
+
+1. No notebook B, abra a mesma pasta no VS Code.
+2. Crie **`cliente-tcp.py`**.
+3. Copie e cole o código inteiro abaixo.
+4. **Troque o valor de `IP_SERVIDOR` pelo IPv4 do notebook A.**
+
+```python
+"""Bloco 4: cliente TCP com chat contínuo. Execute: python cliente-tcp.py"""
+import socket
+
+# Troque pelo IPv4 do notebook que executa servidor-tcp.py.
+# Se estiver tudo no mesmo notebook, use "127.0.0.1".
+IP_SERVIDOR = "192.168.1.10"
+PORTA = 5000
+
+# socket(): cria um socket IPv4 e TCP.
+cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+try:
+    # connect(): estabelece a conexão TCP com o servidor.
+    cliente.settimeout(5)
+    cliente.connect((IP_SERVIDOR, PORTA))
+    cliente.settimeout(None)  # Chat sem limite de espera entre mensagens.
+    print("Conectado! Escreva mensagens; /sair encerra o cliente.")
+
+    # Usaremos uma linha por mensagem, delimitada por \n.
+    entrada = cliente.makefile("r", encoding="utf-8")
+    with entrada:
+        while True:  # Mantém o chat aberto.
+            mensagem = input("Você: ")
+            if mensagem.lower() == "/sair":
+                break
+            if not mensagem:
+                continue
+
+            # sendall(): envia os bytes da mensagem ao servidor.
+            cliente.sendall((mensagem + "\n").encode("utf-8"))
+
+            # readline(): lê a resposta completa, até \n.
+            resposta = entrada.readline()
+            if not resposta:
+                print("Servidor encerrou a conexão.")
+                break
+            print(resposta.rstrip("\r\n"))
+
+except (KeyboardInterrupt, EOFError):
+    print("\nCliente encerrado.")
+except OSError as erro:
+    print("Erro de rede:", erro)
+finally:
+    cliente.close()
 ```
 
-**Deixem esse terminal aberto.**
-
-## 3. TCP: cliente
-
-No notebook B, abram [cliente_tcp.py](cliente_tcp.py). Vejam os comentários de `socket()`, `connect()`, `sendall()` e `readline()`.
-
-Em outro terminal:
+**Executar no notebook B:**
 
 ```powershell
-python cliente_tcp.py
+python cliente-tcp.py
 ```
 
-Escrevam `Olá, servidor!` e pressionem Enter. O cliente deverá exibir:
+**Teste:** digite `Olá, servidor!`, pressione Enter e veja `Servidor recebeu: Olá, servidor!`. Envie outras mensagens. Digite `/sair` para fechar somente o cliente. O servidor continua esperando novas conexões. `Ctrl+C` encerra o servidor.
 
-```text
-Conectado! Escreva mensagens; /sair encerra o cliente.
-Você: Olá, servidor!
-Servidor recebeu: Olá, servidor!
+**Por que há `\n` nos dados?** TCP é um fluxo de bytes, não uma sequência de mensagens prontas. Por isso usamos uma quebra de linha para marcar o fim de cada mensagem, e `readline()` para recebê-la.
+
+## Passo 3 — Criar servidor UDP
+
+1. No notebook A, crie **`servidor-udp.py`**.
+2. Copie todo o código abaixo:
+
+```python
+"""Bloco 4: servidor UDP contínuo. Execute: python servidor-udp.py"""
+import socket
+
+HOST = "0.0.0.0"
+PORTA = 5001  # Porta diferente da usada pelo servidor TCP.
+
+# socket(): cria socket IPv4 e UDP (SOCK_DGRAM).
+servidor = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+# bind(): define a porta onde chegam os datagramas.
+servidor.bind((HOST, PORTA))
+print(f"Servidor UDP ativo na porta {PORTA}. Ctrl+C para encerrar.")
+
+try:
+    while True:
+        # recvfrom(): recebe até 2048 bytes e identifica o remetente.
+        dados, endereco = servidor.recvfrom(2048)
+        texto = dados.decode("utf-8")
+
+        # Cada mensagem possui um ID para confirmar a mensagem correta.
+        identificador, separador, mensagem = texto.partition("|")
+        if not separador:
+            print("Datagrama fora do formato esperado:", texto)
+            continue
+
+        print(f"Recebido de {endereco}, ID {identificador}: {mensagem}")
+
+        # sendto(): manda um datagrama para o IP e a porta do remetente.
+        confirmacao = f"ACK:{identificador}"
+        servidor.sendto(confirmacao.encode("utf-8"), endereco)
+
+except KeyboardInterrupt:
+    print("\nServidor encerrado por Ctrl+C.")
+finally:
+    servidor.close()
 ```
 
-Escrevam mais duas mensagens. `/sair` encerra **apenas o cliente**; o servidor volta a aguardar outro cliente. Para encerrar o servidor, usem `Ctrl+C`.
-
-**Pergunta para discussão:** por que `connect()` precisa funcionar antes de o cliente TCP enviar dados?
-
-## 4. UDP: servidor e cliente
-
-No notebook A, **sem precisar fechar o servidor TCP**, abram outro terminal e executem:
+**Executar no notebook A, em outro terminal:**
 
 ```powershell
-python servidor_udp.py
+python servidor-udp.py
 ```
 
-No notebook B, abram outro terminal e executem:
+**Observe:** o servidor UDP utiliza a porta **5001** e não usa `listen()` nem `accept()`. Ele recebe datagramas diretamente com `recvfrom()`.
+
+## Passo 4 — Criar cliente UDP
+
+1. No notebook B, crie **`cliente-udp.py`**.
+2. Copie todo o código abaixo. Ajuste o `IP_SERVIDOR`.
+
+```python
+"""Bloco 4: cliente UDP contínuo. Execute: python cliente-udp.py"""
+import socket
+
+# Troque pelo IPv4 do notebook que executa servidor-udp.py.
+IP_SERVIDOR = "192.168.1.10"
+PORTA = 5001
+
+# socket(): cria socket IPv4 e UDP, sem estabelecer conexão TCP.
+cliente = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+cliente.settimeout(2)  # Não fica esperando uma resposta para sempre.
+
+contador = 0
+
+try:
+    while True:
+        mensagem = input("Você (/sair para fechar): ")
+        if mensagem.lower() == "/sair":
+            break
+        if not mensagem:
+            continue
+
+        contador += 1
+        identificador = str(contador)
+        pacote = f"{identificador}|{mensagem}"
+
+        # sendto(): envia um datagrama ao destino, sem connect().
+        cliente.sendto(pacote.encode("utf-8"), (IP_SERVIDOR, PORTA))
+
+        try:
+            # recvfrom(): recebe resposta e endereço de origem.
+            dados, endereco = cliente.recvfrom(2048)
+            confirmacao = dados.decode("utf-8")
+            if endereco == (IP_SERVIDOR, PORTA) and confirmacao == f"ACK:{identificador}":
+                print("Servidor confirmou a mensagem!")
+            else:
+                print("Resposta inesperada:", confirmacao, "de", endereco)
+        except socket.timeout:
+            print("Tempo esgotado: não recebemos confirmação UDP.")
+
+except (KeyboardInterrupt, EOFError):
+    print("\nCliente encerrado.")
+except OSError as erro:
+    print("Erro de rede:", erro)
+finally:
+    cliente.close()
+```
+
+**Executar no notebook B:**
 
 ```powershell
-python cliente_udp.py
+python cliente-udp.py
 ```
 
-Digite `Olá, servidor!`. O cliente deverá mostrar `Servidor confirmou a mensagem!`.
+Digite `Olá, servidor!`. O cliente deverá exibir `Servidor confirmou a mensagem!`. Esse **ACK** foi criado pelo nosso código; **UDP não garante entrega por conta própria**. O ID da mensagem ajuda a reconhecer a confirmação correta.
 
-Leiam os comentários nos arquivos [servidor_udp.py](servidor_udp.py) e [cliente_udp.py](cliente_udp.py):
+**Discussão:** por que o cliente UDP não usa `connect()`? Quais funções aparecem no servidor TCP e não no UDP?
 
-- `SOCK_DGRAM`: cria o socket UDP.
-- `recvfrom()`: recebe dados **e** endereço de quem enviou.
-- `sendto()`: informa o endereço de destino no próprio envio.
-- `settimeout(2)`: espera até 2 segundos por uma resposta.
-- `ACK:1`: é uma **confirmação criada por nosso programa**, não um recurso automático do UDP.
-- `1|Olá, servidor!`: `1` é o número da mensagem, usado para reconhecer sua confirmação.
+### Passo 5 — Troca de papéis
 
-**Pergunta para discussão:** quais funções do servidor TCP não aparecem no servidor UDP? Por quê?
-
-**Troquem de papéis:** o notebook B vira servidor e o A vira cliente. Descubram o IPv4 do novo servidor, alterem `IP_SERVIDOR` nos clientes e repitam um teste TCP e um UDP.
+O aluno B vira servidor e o aluno A vira cliente. No novo servidor, execute `ipconfig` para descobrir o IPv4; atualize os dois arquivos do cliente e repita um teste TCP e outro UDP. Na rede escolar, se os notebooks estiverem isolados, use `127.0.0.1` com cliente e servidor no mesmo notebook.
 
 ---
 
-# BLOCO 5 — Diagnóstico, desempenho e recuperação
+# Bloco 5 — Diagnóstico, velocidade e recuperação
 
-> **Agora vamos modificar os MESMOS quatro arquivos.** Os trechos adicionados estão indicados por `# NOVO - BLOCO 5`. Façam uma alteração por vez e executem novamente.
+**Vamos continuar nos mesmos quatro arquivos.** Nos códigos a seguir, as partes novas estão identificadas como `# NOVO - BLOCO 5`. Lembre-se de executar somente **um servidor de cada protocolo/porta** por vez; reinicie o servidor após alterar o arquivo.
 
-## 5. Diagnóstico: o computador responde? A aplicação responde?
+## Passo 6 — Usar ping, tracert e verificar a porta
 
-Primeiro, **com o servidor TCP aberto**, no notebook B, abram outro terminal (PowerShell) e executem os comandos abaixo. Substituam o IP de exemplo pelo IP real do notebook A:
+No **cliente**, abra outro terminal PowerShell e substitua o IP abaixo pelo IP real do servidor:
 
 ```powershell
 ipconfig
@@ -128,227 +285,395 @@ tracert 192.168.1.10
 Test-NetConnection 192.168.1.10 -Port 5000
 ```
 
-- **`ipconfig`**: mostra os endereços locais.
-- **`ping`**: testa respostas **ICMP** e mostra o tempo de ida e volta (*RTT*). Não testa o programa Python.
-- **`tracert`**: tenta mostrar roteadores intermediários. Na mesma sub-rede pode não haver nenhum. Experimentem também `tracert 8.8.8.8`.
-- **`Test-NetConnection ... -Port 5000`**: testa se é possível estabelecer conexão **TCP** na porta 5000. Um sucesso mostra `TcpTestSucceeded : True`. Não serve para testar UDP.
-- No notebook A, `netstat -ano -p tcp | findstr :5000` mostra o socket TCP em `LISTENING`; `netstat -ano -p udp | findstr :5001` mostra a porta UDP.
+- `ping`: observa respostas ICMP e tempo de ida e volta; **não verifica o programa Python**.
+- `tracert`: tenta mostrar os roteadores intermediários; na mesma sub-rede pode não haver saltos. Para ver mais saltos, experimente `tracert 8.8.8.8`.
+- `Test-NetConnection`: testa se a **porta TCP 5000** aceita conexão; `TcpTestSucceeded: True` indica sucesso. **Não testa UDP**.
+- No notebook servidor, `netstat -ano -p tcp | findstr :5000` mostra a porta TCP; `netstat -ano -p udp | findstr :5001` mostra a porta UDP.
 
-### Simulem três problemas
+**Experimento:** encerre `servidor-tcp.py` com `Ctrl+C`. O `ping` pode continuar funcionando, enquanto o teste da porta 5000 falha. Isso demonstra a diferença entre o computador responder e a aplicação estar disponível.
 
-1. **Fechem o servidor TCP** com `Ctrl+C`. O `ping` **pode continuar respondendo**, mas o teste da porta 5000 deve falhar se não houver outro serviço nessa porta.
-2. **Troquem a porta no cliente TCP para 6000**, com o servidor ouvindo em 5000. Tentem conectar. Depois voltem para 5000.
-3. **Fechem o servidor UDP** e executem o cliente UDP. Ele pode informar ausência de confirmação após o timeout. Um `sendto()` bem-sucedido **não prova** que o servidor recebeu os dados.
+**Outro problema:** com o servidor TCP ativo na porta 5000, mude temporariamente a porta no `cliente-tcp.py` para `6000`. Observe o erro e depois volte para `5000`.
 
-Se `ping` falhar, não conclua automaticamente que TCP está bloqueado: ICMP pode ser filtrado. Firewall e isolamento entre clientes Wi-Fi também podem interferir. **Não desativem o firewall sem orientação da equipe de TI.**
+> Firewalls podem bloquear ICMP independentemente de TCP/UDP. Não desative configurações de segurança da escola sem orientação.
 
-## 6. Simular lentidão no TCP
+## Passo 7 — Simular lentidão TCP
 
-Abram `servidor_tcp.py`. **Acrescentem** a importação no início:
+Abra `servidor-tcp.py`. **Acrescente** `import time` após `import socket` e `time.sleep(2)` depois de imprimir a mensagem do cliente, antes de responder. Essas linhas criam dois segundos de atraso **no programa**, não na rede.
+
+**Ficando assim o código:**
 
 ```python
-# NOVO - BLOCO 5: biblioteca para simular lentidão
+"""Bloco 4: servidor TCP com chat contínuo. Execute: python servidor-tcp.py"""
+import socket
+
+# NOVO - BLOCO 5: permite simular atraso de resposta
 import time
+
+HOST = "0.0.0.0"  # Ouve em todas as interfaces IPv4 do notebook
+PORTA = 5000
+
+# socket(): cria um socket IPv4 (AF_INET) usando TCP (SOCK_STREAM).
+servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+# bind(): associa o socket ao IP local e à porta 5000.
+servidor.bind((HOST, PORTA))
+
+# listen(): começa a aguardar pedidos de conexão TCP.
+servidor.listen()
+print(f"Servidor TCP ativo na porta {PORTA}. Ctrl+C para encerrar.")
+
+try:
+    while True:  # Mantém o servidor disponível para novos clientes.
+        print("\nAguardando cliente...")
+        # accept(): espera um cliente e devolve conexão + endereço remoto.
+        conexao, endereco = servidor.accept()
+        print("Cliente conectado:", endereco)
+
+        try:
+            with conexao:
+                # makefile lê mensagens terminadas em \n; TCP é fluxo de bytes.
+                entrada = conexao.makefile("r", encoding="utf-8")
+                with entrada:
+                    while True:  # Mantém o chat com o cliente atual.
+                        linha = entrada.readline()
+                        if not linha:  # Cliente fechou a conexão.
+                            break
+                        mensagem = linha.rstrip("\r\n")
+                        print(f"Cliente {endereco[0]}: {mensagem}")
+
+                        # NOVO - BLOCO 5: resposta propositalmente lenta
+                        time.sleep(2)
+
+                        # sendall(): envia todos os bytes de uma resposta.
+                        resposta = f"Servidor recebeu: {mensagem}\n"
+                        conexao.sendall(resposta.encode("utf-8"))
+        except OSError as erro:
+            print("Erro na conversa:", erro)
+        print("Cliente desconectado.")
+
+except KeyboardInterrupt:
+    print("\nServidor encerrado por Ctrl+C.")
+finally:
+    servidor.close()  # close(): libera o socket.
 ```
 
-Dentro do `while True` interno, localizem:
+**Teste:** reinicie o servidor e o cliente. Envie `Olá!` e observe a resposta demorar aproximadamente dois segundos. Para continuar, vamos substituir esse código no próximo passo, removendo o atraso.
+
+## Passo 8 — Medir a taxa de transferência TCP
+
+Vamos transferir **1.000.000 de bytes** e aguardar a confirmação do servidor. Taxa aproximada em Mbps = bytes × 8 ÷ segundos ÷ 1.000.000.
+
+**No `servidor-tcp.py`:** remova a simulação de lentidão e adicione o tratamento de mensagens que começam com `TESTE:`. O servidor contará os bytes recebidos e devolverá `RECEBIDOS:<quantidade>`.
+
+**Ficando assim o código do servidor TCP:**
 
 ```python
-mensagem = linha.rstrip("\r\n")
-print(f"Cliente {endereco[0]}: {mensagem}")
+"""Bloco 4: servidor TCP com chat contínuo. Execute: python servidor-tcp.py"""
+import socket
+
+HOST = "0.0.0.0"  # Ouve em todas as interfaces IPv4 do notebook
+PORTA = 5000
+
+# socket(): cria um socket IPv4 (AF_INET) usando TCP (SOCK_STREAM).
+servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+# bind(): associa o socket ao IP local e à porta 5000.
+servidor.bind((HOST, PORTA))
+
+# listen(): começa a aguardar pedidos de conexão TCP.
+servidor.listen()
+print(f"Servidor TCP ativo na porta {PORTA}. Ctrl+C para encerrar.")
+
+try:
+    while True:  # Mantém o servidor disponível para novos clientes.
+        print("\nAguardando cliente...")
+        # accept(): espera um cliente e devolve conexão + endereço remoto.
+        conexao, endereco = servidor.accept()
+        print("Cliente conectado:", endereco)
+
+        try:
+            with conexao:
+                # makefile lê mensagens terminadas em \n; TCP é fluxo de bytes.
+                entrada = conexao.makefile("r", encoding="utf-8")
+                with entrada:
+                    while True:  # Mantém o chat com o cliente atual.
+                        linha = entrada.readline()
+                        if not linha:  # Cliente fechou a conexão.
+                            break
+                        mensagem = linha.rstrip("\r\n")
+                        # NOVO - BLOCO 5: responde a um teste de velocidade
+                        if mensagem.startswith("TESTE:"):
+                            quantidade = len(mensagem[6:].encode("utf-8"))
+                            print(f"Recebidos {quantidade} bytes para teste.")
+                            conexao.sendall(f"RECEBIDOS:{quantidade}\n".encode("utf-8"))
+                            continue
+
+                        print(f"Cliente {endereco[0]}: {mensagem}")
+
+                        # sendall(): envia todos os bytes de uma resposta.
+                        resposta = f"Servidor recebeu: {mensagem}\n"
+                        conexao.sendall(resposta.encode("utf-8"))
+        except OSError as erro:
+            print("Erro na conversa:", erro)
+        print("Cliente desconectado.")
+
+except KeyboardInterrupt:
+    print("\nServidor encerrado por Ctrl+C.")
+finally:
+    servidor.close()  # close(): libera o socket.
 ```
 
-**Logo após essas linhas**, adicionem:
+**No `cliente-tcp.py`:** acrescente `import time` e a opção `/velocidade`, que envia a carga, espera a confirmação e calcula Mbps.
+
+**Ficando assim o código do cliente TCP:**
 
 ```python
-# NOVO - BLOCO 5: simula servidor lento
-time.sleep(2)
-```
+"""Bloco 4: cliente TCP com chat contínuo. Execute: python cliente-tcp.py"""
+import socket
 
-Reiniciem o servidor TCP e enviem uma mensagem. A resposta chegará aproximadamente dois segundos depois. **Isso é atraso criado pela aplicação**, não prova que a rede esteja lenta.
-
-Depois, removam `time.sleep(2)` para a próxima etapa.
-
-## 7. Medir a taxa de transferência TCP
-
-Vamos transferir **1.000.000 de bytes** e medir o tempo até o servidor confirmar que recebeu tudo. A medida inclui transmissão, processamento e ida e volta da confirmação: é uma estimativa didática de **taxa efetiva de aplicação**, não da velocidade máxima do Wi-Fi.
-
-### 7.1. Alterar `servidor_tcp.py`
-
-No início, adicionem:
-
-```python
-# NOVO - BLOCO 5: tempo para medir a recepção
+# NOVO - BLOCO 5: cronômetro para medir a taxa efetiva
 import time
+
+# Troque pelo IPv4 do notebook que executa servidor-tcp.py.
+# Se estiver tudo no mesmo notebook, use "127.0.0.1".
+IP_SERVIDOR = "192.168.1.10"
+PORTA = 5000
+
+# socket(): cria um socket IPv4 e TCP.
+cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+try:
+    # connect(): estabelece a conexão TCP com o servidor.
+    cliente.settimeout(5)
+    cliente.connect((IP_SERVIDOR, PORTA))
+    cliente.settimeout(None)  # Chat sem limite de espera entre mensagens.
+    print("Conectado! Escreva mensagens; /sair encerra o cliente.")
+
+    # Usaremos uma linha por mensagem, delimitada por \n.
+    entrada = cliente.makefile("r", encoding="utf-8")
+    with entrada:
+        while True:  # Mantém o chat aberto.
+            mensagem = input("Você: ")
+            if mensagem.lower() == "/sair":
+                break
+            if not mensagem:
+                continue
+
+            # NOVO - BLOCO 5: digite /velocidade no chat
+            if mensagem == "/velocidade":
+                carga = "A" * 1_000_000
+                inicio = time.perf_counter()
+                cliente.sendall(("TESTE:" + carga + "\n").encode("utf-8"))
+                confirmacao = entrada.readline().strip()
+                duracao = time.perf_counter() - inicio
+
+                if confirmacao == "RECEBIDOS:1000000":
+                    mbps = (1_000_000 * 8) / (duracao * 1_000_000)
+                    print(f"Tempo total: {duracao:.3f} segundos")
+                    print(f"Taxa efetiva aproximada: {mbps:.2f} Mbps")
+                else:
+                    print("Falha na confirmação:", confirmacao)
+                continue
+
+            # sendall(): envia os bytes da mensagem ao servidor.
+            cliente.sendall((mensagem + "\n").encode("utf-8"))
+
+            # readline(): lê a resposta completa, até \n.
+            resposta = entrada.readline()
+            if not resposta:
+                print("Servidor encerrou a conexão.")
+                break
+            print(resposta.rstrip("\r\n"))
+
+except (KeyboardInterrupt, EOFError):
+    print("\nCliente encerrado.")
+except OSError as erro:
+    print("Erro de rede:", erro)
+finally:
+    cliente.close()
 ```
 
-Dentro do `while True` interno, **depois** de `mensagem = linha.rstrip("\r\n")` e **antes** do `print` normal, adicionem:
+**Teste:** reinicie servidor e cliente TCP; no chat do cliente, digite **`/velocidade`**. Observe `Tempo total` e `Taxa efetiva aproximada`. Trata-se de um teste didático com confirmação, não da velocidade máxima do Wi-Fi. O tempo inclui ida/volta e processamento.
+
+## Passo 9 — Simular perda de mensagens UDP
+
+Agora o servidor UDP **descartará a primeira tentativa** de cada mensagem, sem enviar ACK. A perda é simulada **no código da aplicação**, não no sinal Wi-Fi.
+
+No `servidor-udp.py`, acrescente os conjuntos `descartados` e `processados`, que identificam mensagens pelo endereço do cliente e ID. Depois de receber o datagrama, se for a primeira tentativa, use `continue` para ignorá-lo; se for retransmissão, confirme sem processar duas vezes.
+
+**Ficando assim o código do servidor UDP:**
 
 ```python
-# NOVO - BLOCO 5: interpreta um comando de teste de velocidade
-if mensagem.startswith("TESTE:"):
-    dados_teste = mensagem[6:]
-    quantidade = len(dados_teste.encode("utf-8"))
-    print(f"Teste de velocidade: {quantidade} bytes recebidos")
-    conexao.sendall(f"RECEBIDOS:{quantidade}\n".encode("utf-8"))
-    continue
-```
+"""Bloco 4: servidor UDP contínuo. Execute: python servidor-udp.py"""
+import socket
 
-### 7.2. Alterar `cliente_tcp.py`
+HOST = "0.0.0.0"
+PORTA = 5001  # Porta diferente da usada pelo servidor TCP.
 
-No início do arquivo, adicionem:
-
-```python
-# NOVO - BLOCO 5: cronômetro de alta precisão
-import time
-```
-
-No `while True` do cliente, **logo depois** de verificar `/sair` e a mensagem vazia, **antes** do `sendall` normal, adicionem:
-
-```python
-# NOVO - BLOCO 5: digite /velocidade para enviar 1 MB
-if mensagem == "/velocidade":
-    carga = "A" * 1_000_000
-    inicio = time.perf_counter()
-    cliente.sendall(("TESTE:" + carga + "\n").encode("utf-8"))
-    confirmacao = entrada.readline().strip()
-    duracao = time.perf_counter() - inicio
-
-    if confirmacao == "RECEBIDOS:1000000":
-        mbps = (1_000_000 * 8) / (duracao * 1_000_000)
-        print(f"Tempo total: {duracao:.3f} s")
-        print(f"Taxa efetiva aproximada: {mbps:.2f} Mbps")
-    else:
-        print("Confirmação inválida:", confirmacao)
-    continue
-```
-
-Reiniciem o servidor e o cliente TCP. No chat, digitem `/velocidade`. A taxa varia conforme os notebooks, o Wi-Fi e o processamento. O teste **não** mede a latência pura da rede.
-
-> No TCP, o código usa mensagens terminadas em `\n`, por isso o servidor consegue distinguir uma linha de texto da próxima. Para cargas maiores, uma aplicação profissional normalmente usa um protocolo próprio de enquadramento e transmissão em blocos.
-
-## 8. Simular perda UDP e recuperar por retransmissão
-
-**Meta:** o servidor descarta de propósito a **primeira tentativa** de cada mensagem. O cliente espera dois segundos; se não receber `ACK`, retransmite **o mesmo ID**. É uma simulação de perda **na aplicação**, não uma queda real de pacotes no Wi-Fi.
-
-### 8.1. Alterar `servidor_udp.py`
-
-Depois de `PORTA = 5001`, acrescentem:
-
-```python
-# NOVO - BLOCO 5: guarda (cliente, ID) descartados uma vez
+# NOVO - BLOCO 5: identifica a primeira tentativa de cada mensagem
 descartados = set()
 
-# NOVO - BLOCO 5: evita processar a mesma mensagem duas vezes
-confirmados = set()
+# NOVO - BLOCO 5: evita processar a mesma mensagem mais de uma vez
+processados = set()
+
+# socket(): cria socket IPv4 e UDP (SOCK_DGRAM).
+servidor = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+# bind(): define a porta onde chegam os datagramas.
+servidor.bind((HOST, PORTA))
+print(f"Servidor UDP ativo na porta {PORTA}. Ctrl+C para encerrar.")
+
+try:
+    while True:
+        # recvfrom(): recebe até 2048 bytes e identifica o remetente.
+        dados, endereco = servidor.recvfrom(2048)
+        texto = dados.decode("utf-8")
+
+        # Cada mensagem possui um ID para confirmar a mensagem correta.
+        identificador, separador, mensagem = texto.partition("|")
+        if not separador:
+            print("Datagrama fora do formato esperado:", texto)
+            continue
+
+        # NOVO - BLOCO 5: usa origem + ID como identificador
+        chave = (endereco, identificador)
+
+        # Descarta propositalmente a primeira tentativa
+        if chave not in descartados:
+            descartados.add(chave)
+            print(f"PERDA SIMULADA: mensagem ID {identificador}")
+            continue
+
+        if chave not in processados:
+            processados.add(chave)
+            print(f"MENSAGEM RECUPERADA: ID {identificador}: {mensagem}")
+        else:
+            print(f"DUPLICATA: ID {identificador}; reenviando ACK")
+
+        # sendto(): manda um datagrama para o IP e a porta do remetente.
+        confirmacao = f"ACK:{identificador}"
+        servidor.sendto(confirmacao.encode("utf-8"), endereco)
+
+except KeyboardInterrupt:
+    print("\nServidor encerrado por Ctrl+C.")
+finally:
+    servidor.close()
 ```
 
-Dentro do `while True`, **depois** deste trecho já existente:
+**Teste intermediário:** reinicie o servidor UDP e execute o cliente UDP ainda no código do Bloco 4. Envie uma mensagem: o servidor mostra `PERDA SIMULADA` e o cliente termina com timeout, sem confirmação. É exatamente esse problema que resolveremos no próximo passo.
+
+## Passo 10 — Recuperar mensagens UDP com timeout e retransmissão
+
+No `cliente-udp.py`, substitua o envio único por um laço que tenta **até três vezes**. Se não chegar `ACK:<ID>` em 2 segundos, reenvie **a mesma mensagem com o mesmo ID**.
+
+**Ficando assim o código do cliente UDP:**
 
 ```python
-if not separador:
-    print("Datagrama fora do formato esperado:", texto)
-    continue
-```
+"""Bloco 4: cliente UDP contínuo. Execute: python cliente-udp.py"""
+import socket
 
-adicionem:
+# Troque pelo IPv4 do notebook que executa servidor-udp.py.
+IP_SERVIDOR = "192.168.1.10"
+PORTA = 5001
 
-```python
-# NOVO - BLOCO 5: identifica a mensagem por origem e número
-chave = (endereco, identificador)
+# socket(): cria socket IPv4 e UDP, sem estabelecer conexão TCP.
+cliente = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+cliente.settimeout(2)  # Não fica esperando uma resposta para sempre.
 
-# Primeira tentativa: descarta, sem mandar ACK
-if chave not in descartados:
-    descartados.add(chave)
-    print(f"PERDA SIMULADA: ID {identificador}")
-    continue
+contador = 0
 
-# Se uma confirmação anterior se perdeu, responder sem repetir ação
-if chave in confirmados:
-    print(f"REPETIÇÃO: ID {identificador}; reenviando ACK")
-else:
-    confirmados.add(chave)
-    print(f"RECUPERADA: ID {identificador}: {mensagem}")
-```
-
-O código original continuará enviando `ACK:<ID>` ao final. Para a demonstração, esta lógica mantém as chaves na memória até encerrar o servidor. Em sistemas reais, seria necessário gerenciar tempo de retenção e memória.
-
-### 8.2. Alterar `cliente_udp.py`
-
-Dentro do `while True`, **substituam** o trecho que vai de `cliente.sendto(...)` até o final do `except socket.timeout` pelo código abaixo:
-
-```python
-# NOVO - BLOCO 5: retransmite até 3 vezes se não receber ACK
-confirmado = False
-
-for tentativa in range(1, 4):
-    print(f"Tentativa {tentativa}, mensagem ID {identificador}")
-
-    # Reutiliza exatamente o mesmo pacote e o mesmo ID
-    cliente.sendto(pacote.encode("utf-8"), (IP_SERVIDOR, PORTA))
-
-    try:
-        dados, endereco = cliente.recvfrom(2048)
-        confirmacao = dados.decode("utf-8")
-
-        if endereco == (IP_SERVIDOR, PORTA) and confirmacao == f"ACK:{identificador}":
-            print("Mensagem confirmada!")
-            confirmado = True
+try:
+    while True:
+        mensagem = input("Você (/sair para fechar): ")
+        if mensagem.lower() == "/sair":
             break
+        if not mensagem:
+            continue
 
-        print("Confirmação inesperada; aguardaremos nova tentativa.")
+        contador += 1
+        identificador = str(contador)
+        pacote = f"{identificador}|{mensagem}"
 
-    except socket.timeout:
-        print("Timeout! Sem confirmação; tentando de novo.")
+        # NOVO - BLOCO 5: reenvia o mesmo datagrama até 3 vezes
+        confirmado = False
 
-if not confirmado:
-    print("Falhou: nenhuma confirmação válida após 3 tentativas.")
+        for tentativa in range(1, 4):
+            print(f"Tentativa {tentativa} — mensagem ID {identificador}")
+
+            # sendto(): envia o datagrama sem conexão prévia
+            cliente.sendto(pacote.encode("utf-8"), (IP_SERVIDOR, PORTA))
+
+            try:
+                # recvfrom(): recebe a confirmação do servidor
+                dados, endereco = cliente.recvfrom(2048)
+                confirmacao = dados.decode("utf-8")
+
+                if endereco == (IP_SERVIDOR, PORTA) and confirmacao == f"ACK:{identificador}":
+                    print("Mensagem confirmada!")
+                    confirmado = True
+                    break
+
+                print("Confirmação inesperada:", confirmacao)
+
+            except socket.timeout:
+                print("Timeout: servidor não confirmou. Reenviando...")
+
+        if not confirmado:
+            print("Não foi possível confirmar após 3 tentativas.")
+
+except (KeyboardInterrupt, EOFError):
+    print("\nCliente encerrado.")
+except OSError as erro:
+    print("Erro de rede:", erro)
+finally:
+    cliente.close()
 ```
 
-**Executem primeiro o servidor UDP e depois o cliente UDP.**
+**Teste:** reinicie os dois programas UDP e envie `Olá, servidor!`.
 
-Cliente esperado:
+**Cliente esperado:**
 
 ```text
-Você (/sair para fechar): Olá, servidor!
-Tentativa 1, mensagem ID 1
-Timeout! Sem confirmação; tentando de novo.
-Tentativa 2, mensagem ID 1
+Tentativa 1 — mensagem ID 1
+Timeout: servidor não confirmou. Reenviando...
+Tentativa 2 — mensagem ID 1
 Mensagem confirmada!
 ```
 
-Servidor esperado:
+**Servidor esperado:**
 
 ```text
-PERDA SIMULADA: ID 1
-RECUPERADA: ID 1: Olá, servidor!
+PERDA SIMULADA: mensagem ID 1
+MENSAGEM RECUPERADA: ID 1: Olá, servidor!
 ```
 
-**Pergunta:** quem criou a recuperação — o UDP ou o nosso programa? **Nosso programa.** A confirmação pode se perder também; por isso mantivemos o mesmo ID e uma lista de mensagens já confirmadas.
+A recuperação não é feita automaticamente pelo UDP: **foi implementada por nós** com identificador, ACK, timeout e retransmissão. No exemplo didático, os conjuntos ficam em memória e são zerados ao reiniciar o programa; um sistema real exigiria controles adicionais de duplicatas, autenticação e consumo de memória.
 
-> **Atenção:** este exemplo é para sala de aula. Não implementa um protocolo UDP completo ou seguro; números de sequência persistentes, autenticação, tratamento mais robusto de ACKs e controle de memória seriam necessários em aplicações reais.
+---
 
-## 9. Conclusão: desempenho, QoS e segurança
+## Revisão final — desempenho, QoS e segurança
 
-| Tema | O que observar |
+| Conceito | O que significa |
 | --- | --- |
-| Latência | `ping` mostra o tempo de ida e volta ICMP; `sleep` simula atraso de aplicação. |
-| Taxa de transferência | O comando `/velocidade` mede bytes confirmados por segundo no TCP. |
-| Perda e retransmissão | Nosso UDP simula perda e precisa de confirmação, timeout e nova tentativa. |
-| Jitter | Variação no tempo de chegada dos pacotes, relevante para áudio e jogos. |
-| QoS | Políticas de priorização de tráfego, especialmente quando há congestionamento. |
-| Firewall | Pode bloquear ICMP, TCP ou UDP de formas diferentes. |
-| Criptografia | TCP e UDP **não criptografam por padrão**; HTTPS usa TLS sobre TCP e QUIC usa TLS sobre UDP. |
-| Autenticação | A aplicação precisa verificar com quem está se comunicando. |
-| Controle de acesso | Restringir quem pode usar uma aplicação ou serviço. |
+| **Latência** | Tempo de ida e volta; o `ping` observa RTT de ICMP. |
+| **Taxa de transferência** | Dados efetivamente transferidos por segundo (Mbps). |
+| **Jitter** | Variação dos tempos de chegada dos pacotes. |
+| **Perda de pacotes** | Dados que não chegam ao receptor; no exercício simulamos a ausência de entrega na aplicação. |
+| **QoS** | Priorização e gerenciamento do tráfego, especialmente em congestionamento. |
+| **Firewall** | Pode restringir comunicações por protocolo, IP e porta. |
+| **Criptografia** | TCP e UDP não criptografam por padrão; aplicações usam protocolos como TLS/QUIC para proteção. |
+| **Autenticação** | Verifica a identidade de quem acessa um sistema. |
+| **Controle de acesso** | Define quais clientes podem usar o serviço. |
 
-**Concluído:** vocês criaram cliente e servidor TCP/UDP, fizeram testes de conectividade, simularam lentidão, mediram taxa efetiva e implementaram retransmissão UDP.
+### Solução rápida de problemas
 
-### Se algo não funcionar
+- **`python` não funciona:** teste `py` ou confira a instalação do Python.
+- **`ConnectionRefusedError`:** servidor TCP não está ouvindo no IP/porta informados.
+- **`Timeout`:** verifique servidor, IP, firewall e isolamento entre os notebooks.
+- **`Address already in use`:** outra execução já está usando a porta.
+- **Não conecta no Wi-Fi da escola:** experimente os programas no mesmo notebook com `127.0.0.1`.
+- **UDP não confirma:** verifique a porta **5001** e se o servidor UDP está executando.
 
-- **`ConnectionRefusedError`:** servidor TCP fechado, IP/porta errados ou serviço indisponível.
-- **Timeout:** a rede, firewall, isolamento Wi-Fi ou servidor podem impedir a resposta.
-- **`Address already in use`:** outra execução já utiliza a mesma porta; encerrem a anterior.
-- **`python` não reconhecido:** tentem `py` ou verifiquem a instalação.
-- **Wi-Fi da escola impede comunicação:** usem `127.0.0.1` nos dois programas no mesmo notebook.
-- **Nenhuma resposta no UDP:** chequem porta **5001**, IP do servidor e se o servidor UDP está aberto.
+**Você concluiu a aula quando conseguir:** fazer os dois chats funcionarem; identificar diferença entre teste de rede e teste de aplicação; medir taxa de transferência; simular perda UDP e recuperar a mensagem por retransmissão.

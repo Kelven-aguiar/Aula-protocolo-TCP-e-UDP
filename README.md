@@ -270,9 +270,9 @@ O aluno B vira servidor e o aluno A vira cliente. No novo servidor, execute `ipc
 
 ---
 
-# Bloco 5 — Diagnóstico, velocidade e recuperação
+# Bloco 5 — Diagnóstico e taxa de transferência
 
-**Vamos continuar nos mesmos quatro arquivos.** Nos códigos a seguir, as partes novas estão identificadas como `# NOVO - BLOCO 5`. Lembre-se de executar somente **um servidor de cada protocolo/porta** por vez; reinicie o servidor após alterar o arquivo.
+**Vamos continuar nos mesmos quatro arquivos.** No teste de velocidade, as partes novas estão identificadas como `# NOVO - BLOCO 5`. Lembre-se de executar somente **um servidor de cada protocolo/porta** por vez; reinicie o servidor após alterar o arquivo.
 
 ## Passo 6 — Usar ping, tracert e verificar a porta
 
@@ -296,75 +296,11 @@ Test-NetConnection 192.168.1.10 -Port 5000
 
 > Firewalls podem bloquear ICMP independentemente de TCP/UDP. Não desative configurações de segurança da escola sem orientação.
 
-## Passo 7 — Simular lentidão TCP
-
-Abra `servidor-tcp.py`. **Acrescente** `import time` após `import socket` e `time.sleep(2)` depois de imprimir a mensagem do cliente, antes de responder. Essas linhas criam dois segundos de atraso **no programa**, não na rede.
-
-**Ficando assim o código:**
-
-```python
-"""Bloco 4: servidor TCP com chat contínuo. Execute: python servidor-tcp.py"""
-import socket
-
-# NOVO - BLOCO 5: permite simular atraso de resposta
-import time
-
-HOST = "0.0.0.0"  # Ouve em todas as interfaces IPv4 do notebook
-PORTA = 5000
-
-# socket(): cria um socket IPv4 (AF_INET) usando TCP (SOCK_STREAM).
-servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-# bind(): associa o socket ao IP local e à porta 5000.
-servidor.bind((HOST, PORTA))
-
-# listen(): começa a aguardar pedidos de conexão TCP.
-servidor.listen()
-print(f"Servidor TCP ativo na porta {PORTA}. Ctrl+C para encerrar.")
-
-try:
-    while True:  # Mantém o servidor disponível para novos clientes.
-        print("\nAguardando cliente...")
-        # accept(): espera um cliente e devolve conexão + endereço remoto.
-        conexao, endereco = servidor.accept()
-        print("Cliente conectado:", endereco)
-
-        try:
-            with conexao:
-                # makefile lê mensagens terminadas em \n; TCP é fluxo de bytes.
-                entrada = conexao.makefile("r", encoding="utf-8")
-                with entrada:
-                    while True:  # Mantém o chat com o cliente atual.
-                        linha = entrada.readline()
-                        if not linha:  # Cliente fechou a conexão.
-                            break
-                        mensagem = linha.rstrip("\r\n")
-                        print(f"Cliente {endereco[0]}: {mensagem}")
-
-                        # NOVO - BLOCO 5: resposta propositalmente lenta
-                        time.sleep(2)
-
-                        # sendall(): envia todos os bytes de uma resposta.
-                        resposta = f"Servidor recebeu: {mensagem}\n"
-                        conexao.sendall(resposta.encode("utf-8"))
-        except OSError as erro:
-            print("Erro na conversa:", erro)
-        print("Cliente desconectado.")
-
-except KeyboardInterrupt:
-    print("\nServidor encerrado por Ctrl+C.")
-finally:
-    servidor.close()  # close(): libera o socket.
-```
-
-**Teste:** reinicie o servidor e o cliente. Envie `Olá!` e observe a resposta demorar aproximadamente dois segundos. Para continuar, vamos substituir esse código no próximo passo, removendo o atraso.
-
-## Passo 8 — Medir a taxa de transferência TCP
+## Passo 7 — Medir a taxa de transferência TCP
 
 Vamos transferir **1.000.000 de bytes** e aguardar a confirmação do servidor. Taxa aproximada em Mbps = bytes × 8 ÷ segundos ÷ 1.000.000.
 
-**No `servidor-tcp.py`:** remova a simulação de lentidão e adicione o tratamento de mensagens que começam com `TESTE:`. O servidor contará os bytes recebidos e devolverá `RECEBIDOS:<quantidade>`.
+**No `servidor-tcp.py`:** adicione o tratamento de mensagens que começam com `TESTE:`. O servidor contará os bytes recebidos e devolverá `RECEBIDOS:<quantidade>`.
 
 **Ficando assim o código do servidor TCP:**
 
@@ -497,162 +433,6 @@ finally:
 
 **Teste:** reinicie servidor e cliente TCP; no chat do cliente, digite **`/velocidade`**. Observe `Tempo total` e `Taxa efetiva aproximada`. Trata-se de um teste didático com confirmação, não da velocidade máxima do Wi-Fi. O tempo inclui ida/volta e processamento.
 
-## Passo 9 — Simular perda de mensagens UDP
-
-Agora o servidor UDP **descartará a primeira tentativa** de cada mensagem, sem enviar ACK. A perda é simulada **no código da aplicação**, não no sinal Wi-Fi.
-
-No `servidor-udp.py`, acrescente os conjuntos `descartados` e `processados`, que identificam mensagens pelo endereço do cliente e ID. Depois de receber o datagrama, se for a primeira tentativa, use `continue` para ignorá-lo; se for retransmissão, confirme sem processar duas vezes.
-
-**Ficando assim o código do servidor UDP:**
-
-```python
-"""Bloco 4: servidor UDP contínuo. Execute: python servidor-udp.py"""
-import socket
-
-HOST = "0.0.0.0"
-PORTA = 5001  # Porta diferente da usada pelo servidor TCP.
-
-# NOVO - BLOCO 5: identifica a primeira tentativa de cada mensagem
-descartados = set()
-
-# NOVO - BLOCO 5: evita processar a mesma mensagem mais de uma vez
-processados = set()
-
-# socket(): cria socket IPv4 e UDP (SOCK_DGRAM).
-servidor = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-# bind(): define a porta onde chegam os datagramas.
-servidor.bind((HOST, PORTA))
-print(f"Servidor UDP ativo na porta {PORTA}. Ctrl+C para encerrar.")
-
-try:
-    while True:
-        # recvfrom(): recebe até 2048 bytes e identifica o remetente.
-        dados, endereco = servidor.recvfrom(2048)
-        texto = dados.decode("utf-8")
-
-        # Cada mensagem possui um ID para confirmar a mensagem correta.
-        identificador, separador, mensagem = texto.partition("|")
-        if not separador:
-            print("Datagrama fora do formato esperado:", texto)
-            continue
-
-        # NOVO - BLOCO 5: usa origem + ID como identificador
-        chave = (endereco, identificador)
-
-        # Descarta propositalmente a primeira tentativa
-        if chave not in descartados:
-            descartados.add(chave)
-            print(f"PERDA SIMULADA: mensagem ID {identificador}")
-            continue
-
-        if chave not in processados:
-            processados.add(chave)
-            print(f"MENSAGEM RECUPERADA: ID {identificador}: {mensagem}")
-        else:
-            print(f"DUPLICATA: ID {identificador}; reenviando ACK")
-
-        # sendto(): manda um datagrama para o IP e a porta do remetente.
-        confirmacao = f"ACK:{identificador}"
-        servidor.sendto(confirmacao.encode("utf-8"), endereco)
-
-except KeyboardInterrupt:
-    print("\nServidor encerrado por Ctrl+C.")
-finally:
-    servidor.close()
-```
-
-**Teste intermediário:** reinicie o servidor UDP e execute o cliente UDP ainda no código do Bloco 4. Envie uma mensagem: o servidor mostra `PERDA SIMULADA` e o cliente termina com timeout, sem confirmação. É exatamente esse problema que resolveremos no próximo passo.
-
-## Passo 10 — Recuperar mensagens UDP com timeout e retransmissão
-
-No `cliente-udp.py`, substitua o envio único por um laço que tenta **até três vezes**. Se não chegar `ACK:<ID>` em 2 segundos, reenvie **a mesma mensagem com o mesmo ID**.
-
-**Ficando assim o código do cliente UDP:**
-
-```python
-"""Bloco 4: cliente UDP contínuo. Execute: python cliente-udp.py"""
-import socket
-
-# Troque pelo IPv4 do notebook que executa servidor-udp.py.
-IP_SERVIDOR = "192.168.1.10"
-PORTA = 5001
-
-# socket(): cria socket IPv4 e UDP, sem estabelecer conexão TCP.
-cliente = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-cliente.settimeout(2)  # Não fica esperando uma resposta para sempre.
-
-contador = 0
-
-try:
-    while True:
-        mensagem = input("Você (/sair para fechar): ")
-        if mensagem.lower() == "/sair":
-            break
-        if not mensagem:
-            continue
-
-        contador += 1
-        identificador = str(contador)
-        pacote = f"{identificador}|{mensagem}"
-
-        # NOVO - BLOCO 5: reenvia o mesmo datagrama até 3 vezes
-        confirmado = False
-
-        for tentativa in range(1, 4):
-            print(f"Tentativa {tentativa} — mensagem ID {identificador}")
-
-            # sendto(): envia o datagrama sem conexão prévia
-            cliente.sendto(pacote.encode("utf-8"), (IP_SERVIDOR, PORTA))
-
-            try:
-                # recvfrom(): recebe a confirmação do servidor
-                dados, endereco = cliente.recvfrom(2048)
-                confirmacao = dados.decode("utf-8")
-
-                if endereco == (IP_SERVIDOR, PORTA) and confirmacao == f"ACK:{identificador}":
-                    print("Mensagem confirmada!")
-                    confirmado = True
-                    break
-
-                print("Confirmação inesperada:", confirmacao)
-
-            except socket.timeout:
-                print("Timeout: servidor não confirmou. Reenviando...")
-
-        if not confirmado:
-            print("Não foi possível confirmar após 3 tentativas.")
-
-except (KeyboardInterrupt, EOFError):
-    print("\nCliente encerrado.")
-except OSError as erro:
-    print("Erro de rede:", erro)
-finally:
-    cliente.close()
-```
-
-**Teste:** reinicie os dois programas UDP e envie `Olá, servidor!`.
-
-**Cliente esperado:**
-
-```text
-Tentativa 1 — mensagem ID 1
-Timeout: servidor não confirmou. Reenviando...
-Tentativa 2 — mensagem ID 1
-Mensagem confirmada!
-```
-
-**Servidor esperado:**
-
-```text
-PERDA SIMULADA: mensagem ID 1
-MENSAGEM RECUPERADA: ID 1: Olá, servidor!
-```
-
-A recuperação não é feita automaticamente pelo UDP: **foi implementada por nós** com identificador, ACK, timeout e retransmissão. No exemplo didático, os conjuntos ficam em memória e são zerados ao reiniciar o programa; um sistema real exigiria controles adicionais de duplicatas, autenticação e consumo de memória.
-
----
-
 ## Revisão final — desempenho, QoS e segurança
 
 | Conceito | O que significa |
@@ -660,7 +440,7 @@ A recuperação não é feita automaticamente pelo UDP: **foi implementada por n
 | **Latência** | Tempo de ida e volta; o `ping` observa RTT de ICMP. |
 | **Taxa de transferência** | Dados efetivamente transferidos por segundo (Mbps). |
 | **Jitter** | Variação dos tempos de chegada dos pacotes. |
-| **Perda de pacotes** | Dados que não chegam ao receptor; no exercício simulamos a ausência de entrega na aplicação. |
+| **Perda de pacotes** | Dados que não chegam ao destino; TCP pode retransmitir segmentos perdidos, enquanto UDP não possui retransmissão automática. |
 | **QoS** | Priorização e gerenciamento do tráfego, especialmente em congestionamento. |
 | **Firewall** | Pode restringir comunicações por protocolo, IP e porta. |
 | **Criptografia** | TCP e UDP não criptografam por padrão; aplicações usam protocolos como TLS/QUIC para proteção. |
@@ -676,4 +456,4 @@ A recuperação não é feita automaticamente pelo UDP: **foi implementada por n
 - **Não conecta no Wi-Fi da escola:** experimente os programas no mesmo notebook com `127.0.0.1`.
 - **UDP não confirma:** verifique a porta **5001** e se o servidor UDP está executando.
 
-**Você concluiu a aula quando conseguir:** fazer os dois chats funcionarem; identificar diferença entre teste de rede e teste de aplicação; medir taxa de transferência; simular perda UDP e recuperar a mensagem por retransmissão.
+**Você concluiu a aula quando conseguir:** fazer os dois chats funcionarem; distinguir teste de rede e teste de aplicação; medir a taxa de transferência TCP.

@@ -262,11 +262,7 @@ python cliente-udp.py
 
 Digite `Olá, servidor!`. O cliente deverá exibir `Servidor confirmou a mensagem!`. Esse **ACK** foi criado pelo nosso código; **UDP não garante entrega por conta própria**. O ID da mensagem ajuda a reconhecer a confirmação correta.
 
-**Discussão:** por que o cliente UDP não usa `connect()`? Quais funções aparecem no servidor TCP e não no UDP?
-
-### Passo 5 — Troca de papéis
-
-O aluno B vira servidor e o aluno A vira cliente. No novo servidor, execute `ipconfig` para descobrir o IPv4; atualize os dois arquivos do cliente e repita um teste TCP e outro UDP. Na rede escolar, se os notebooks estiverem isolados, use `127.0.0.1` com cliente e servidor no mesmo notebook.
+**Pergunta 1:** Por que o cliente UDP não usa `connect()`? Quais funções aparecem no servidor TCP e não no UDP?
 
 ---
 
@@ -274,7 +270,7 @@ O aluno B vira servidor e o aluno A vira cliente. No novo servidor, execute `ipc
 
 **Objetivo:** observar o estabelecimento e encerramento de uma conexão TCP e comparar com o recebimento de datagramas UDP. Não vamos simular perda de pacotes.
 
-## Passo 6 — Testar a comunicação sem servidor
+## Passo 5 — Testar a comunicação sem servidor
 
 1. Pare os dois servidores com `Ctrl+C`.
 2. Execute `cliente-tcp.py`. Como a porta TCP não está ouvindo, a tentativa de `connect()` pode retornar conexão recusada.
@@ -283,7 +279,9 @@ O aluno B vira servidor e o aluno A vira cliente. No novo servidor, execute `ipc
 
 **O que observar:** TCP exige conexão estabelecida antes de enviar. UDP permite o envio de um datagrama sem negociar uma conexão prévia; enviar não significa que alguém recebeu.
 
-## Passo 7 — Mostrar a conexão real no servidor TCP
+**Pergunta 2:** O que aconteceu quando você tentou usar o cliente TCP e o cliente UDP com os respectivos servidores desligados? Qual a diferença entre os resultados?
+
+## Passo 6 — Mostrar a conexão real no servidor TCP
 
 No arquivo `servidor-tcp.py`, acrescente os logs ao redor de `accept()` para visualizar o momento em que o cliente conecta. Acrescente também um log quando a leitura chegar ao fim (EOF).
 
@@ -373,7 +371,7 @@ Execute o servidor e depois o cliente. Observe os endereços da conexão. Digite
 
 **Importante:** o log é gerado pelo estado real do socket. O fim normal do fluxo indica que o outro lado encerrou o envio; uma interrupção de rede nem sempre é percebida imediatamente.
 
-## Passo 8 — Mostrar os datagramas e a ausência de conexão UDP
+## Passo 7 — Mostrar os datagramas e a ausência de conexão UDP
 
 No `servidor-udp.py`, acrescente `settimeout(8)` para observar períodos sem mensagens, e um log do endereço retornado por `recvfrom()`. **Não** há `accept()` nem evento automático de desconexão UDP.
 
@@ -437,7 +435,7 @@ finally:
 
 Execute o servidor UDP e o cliente UDP. Envie uma mensagem, depois digite `/sair` no cliente. O servidor apenas continuará esperando; após oito segundos sem datagramas, poderá mostrar um timeout. Isso **não comprova** que um cliente se desconectou.
 
-## Passo 9 — Comparar os resultados
+## Passo 8 — Comparar os resultados
 
 | Observação | TCP | UDP |
 | --- | --- | --- |
@@ -447,14 +445,14 @@ Execute o servidor UDP e o cliente UDP. Envie uma mensagem, depois digite `/sair
 | Encerramento normal do cliente | Pode gerar fim de fluxo (EOF) | Não existe aviso automático de desconexão |
 | Servidor indisponível | `connect()` pode falhar | `sendto()` pode concluir sem entrega |
 
-**Discussão:** qual protocolo é mais apropriado para enviar um arquivo que deve chegar completo? Por que algumas aplicações de tempo real utilizam UDP?
+**Pergunta 3:** Qual protocolo é mais apropriado para enviar um arquivo que precisa chegar completo? Por que algumas aplicações de tempo real utilizam UDP?
 
 ---
 # Atividade 3 — Diagnóstico de rede e desempenho
 
 **Vamos continuar nos mesmos quatro arquivos.** No teste de velocidade, as partes novas estão identificadas como `# NOVO - ATIVIDADE 3`. Lembre-se de executar somente **um servidor de cada protocolo/porta** por vez; reinicie o servidor após alterar o arquivo.
 
-## Passo 10 — Usar ping, tracert e verificar a porta
+## Passo 9 — Usar ping, tracert e verificar a porta
 
 No **cliente**, abra outro terminal PowerShell e substitua o IP abaixo pelo IP real do servidor:
 
@@ -472,11 +470,11 @@ Test-NetConnection 192.168.1.10 -Port 5000
 
 **Experimento:** encerre `servidor-tcp.py` com `Ctrl+C`. O `ping` pode continuar funcionando, enquanto o teste da porta 5000 falha. Isso demonstra a diferença entre o computador responder e a aplicação estar disponível.
 
-## Passo 11 — Verificar no Windows se o TCP está conectado
+## Passo 10 — Verificar no Windows se o TCP está conectado
 
 Agora vamos usar o **`netstat`**, um comando do Windows que mostra conexões e portas de rede. Vamos comparar o que aparece **antes e depois** que um cliente se conecta.
 
-### 11.1 — Servidor TCP aguardando
+### 10.1 — Servidor TCP aguardando
 
 1. No notebook A, execute `python servidor-tcp.py` e deixe o servidor aberto.
 2. No **mesmo notebook A**, abra **outro terminal PowerShell** no VS Code. Não feche o terminal do servidor.
@@ -494,7 +492,7 @@ TCP    0.0.0.0:5000       0.0.0.0:0          LISTENING       1234
 
 **O que significa?** `LISTENING` indica que o servidor TCP está **aguardando conexões** na porta `5000`. O número final, como `1234`, é o identificador do processo (**PID**) e varia entre os computadores.
 
-### 11.2 — Cliente TCP conectado
+### 10.2 — Cliente TCP conectado
 
 1. No notebook B, execute `python cliente-tcp.py`.
 2. **Não digite `/sair`**: deixe o cliente conectado, esperando uma mensagem.
@@ -514,7 +512,7 @@ TCP    192.168.1.10:5000    192.168.1.11:52340    ESTABLISHED    1234
 
 Digite `/sair` no cliente e execute o comando novamente. Aquela conexão deixará de aparecer como `ESTABLISHED` após o encerramento, enquanto o servidor continuará em `LISTENING`.
 
-### 11.3 — Comparar com UDP
+### 10.3 — Comparar com UDP
 
 1. Deixe `servidor-udp.py` executando no notebook A.
 2. Em outro terminal do mesmo notebook, digite:
@@ -533,9 +531,11 @@ UDP    0.0.0.0:5001       *:*                5678
 
 **Conclusão:** no TCP conseguimos observar o servidor aguardando (`LISTENING`) e a conexão aberta (`ESTABLISHED`). No UDP observamos o socket associado à porta, mas não esses estados de conexão.
 
+**Pergunta 4:** Qual estado apareceu quando o servidor TCP estava aguardando? Qual estado apareceu depois que o cliente conectou? Por que não aparecem esses mesmos estados para UDP?
+
 ---
 
-## Passo 12 — Medir a taxa de transferência TCP
+## Passo 11 — Medir a taxa de transferência TCP
 
 Vamos transferir **1.000.000 de bytes** e aguardar a confirmação do servidor. Taxa aproximada em Mbps = bytes × 8 ÷ segundos ÷ 1.000.000.
 

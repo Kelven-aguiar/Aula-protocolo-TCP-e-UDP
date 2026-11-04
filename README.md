@@ -296,6 +296,21 @@ print("[TCP] Endereço local:", conexao.getsockname())
 print("[TCP] Endereço remoto:", conexao.getpeername())
 ```
 
+**O que significam as duas funções novas?**
+
+- `conexao.getsockname()`: consulta o **endereço local desta conexão**, isto é, o IP e a porta do **servidor** no notebook A. Exemplo: `('192.168.1.10', 5000)`.
+- `conexao.getpeername()`: consulta o **endereço remoto desta conexão**, isto é, o IP e a porta do **cliente** no notebook B. Exemplo: `('192.168.1.11', 52340)`.
+
+O número `52340` é uma porta de origem escolhida para a conexão do cliente e pode mudar a cada execução. **Local e remoto dependem de qual computador está executando o código**: aqui, estamos consultando os dois endereços do ponto de vista do servidor.
+
+**Exemplo de saída no servidor:**
+
+```text
+[TCP] Conexão estabelecida: ('192.168.1.11', 52340)
+[TCP] Endereço local: ('192.168.1.10', 5000)
+[TCP] Endereço remoto: ('192.168.1.11', 52340)
+```
+
 **Ficando assim o código completo do `servidor-tcp.py`:**
 
 ```python
@@ -453,29 +468,70 @@ Test-NetConnection 192.168.1.10 -Port 5000
 - `ping`: observa respostas ICMP e tempo de ida e volta; **não verifica o programa Python**.
 - `tracert`: tenta mostrar os roteadores intermediários; na mesma sub-rede pode não haver saltos. Para ver mais saltos, experimente `tracert 8.8.8.8`.
 - `Test-NetConnection`: testa se a **porta TCP 5000** aceita conexão; `TcpTestSucceeded: True` indica sucesso. **Não testa UDP**.
-- No notebook servidor, `netstat -ano -p tcp | findstr :5000` mostra a porta TCP; `netstat -ano -p udp | findstr :5001` mostra a porta UDP.
+- No próximo passo, vamos usar `netstat` para observar os estados dessas conexões no Windows.
 
 **Experimento:** encerre `servidor-tcp.py` com `Ctrl+C`. O `ping` pode continuar funcionando, enquanto o teste da porta 5000 falha. Isso demonstra a diferença entre o computador responder e a aplicação estar disponível.
 
-**Outro problema:** com o servidor TCP ativo na porta 5000, mude temporariamente a porta no `cliente-tcp.py` para `6000`. Observe o erro e depois volte para `5000`.
+## Passo 11 — Verificar no Windows se o TCP está conectado
 
-> Firewalls podem bloquear ICMP independentemente de TCP/UDP. Não desative configurações de segurança da escola sem orientação.
+Agora vamos usar o **`netstat`**, um comando do Windows que mostra conexões e portas de rede. Vamos comparar o que aparece **antes e depois** que um cliente se conecta.
 
-## Passo 11 — Observar estados reais com netstat
+### 11.1 — Servidor TCP aguardando
 
-Com o servidor TCP ativo, no terminal do notebook servidor execute:
+1. No notebook A, execute `python servidor-tcp.py` e deixe o servidor aberto.
+2. No **mesmo notebook A**, abra **outro terminal PowerShell** no VS Code. Não feche o terminal do servidor.
+3. Digite:
 
 ```powershell
 netstat -ano -p tcp | findstr :5000
 ```
 
-Antes de conectar um cliente, observe `LISTENING`. Enquanto houver cliente conectado, procure `ESTABLISHED`. Para UDP:
+Exemplo de resultado:
+
+```text
+TCP    0.0.0.0:5000       0.0.0.0:0          LISTENING       1234
+```
+
+**O que significa?** `LISTENING` indica que o servidor TCP está **aguardando conexões** na porta `5000`. O número final, como `1234`, é o identificador do processo (**PID**) e varia entre os computadores.
+
+### 11.2 — Cliente TCP conectado
+
+1. No notebook B, execute `python cliente-tcp.py`.
+2. **Não digite `/sair`**: deixe o cliente conectado, esperando uma mensagem.
+3. Volte ao segundo terminal do notebook A e execute novamente:
+
+```powershell
+netstat -ano -p tcp | findstr :5000
+```
+
+Agora poderá aparecer também:
+
+```text
+TCP    192.168.1.10:5000    192.168.1.11:52340    ESTABLISHED    1234
+```
+
+**O que significa?** `ESTABLISHED` indica que a conexão TCP foi estabelecida. A primeira coluna de endereço mostra **IP e porta do servidor**; a segunda mostra **IP e porta do cliente**. Os IPs, a porta `52340` e o PID são exemplos e podem ser diferentes.
+
+Digite `/sair` no cliente e execute o comando novamente. Aquela conexão deixará de aparecer como `ESTABLISHED` após o encerramento, enquanto o servidor continuará em `LISTENING`.
+
+### 11.3 — Comparar com UDP
+
+1. Deixe `servidor-udp.py` executando no notebook A.
+2. Em outro terminal do mesmo notebook, digite:
 
 ```powershell
 netstat -ano -p udp | findstr :5001
 ```
 
-UDP não possui os estados de conexão TCP `LISTENING` e `ESTABLISHED`. Se os resultados não aparecerem, verifique se o programa correspondente está aberto.
+Exemplo:
+
+```text
+UDP    0.0.0.0:5001       *:*                5678
+```
+
+**Qual é a diferença?** A porta UDP `5001` aparece, mas não existe `LISTENING` ou `ESTABLISHED` como no TCP. Isso acontece porque o UDP **não estabelece uma conexão TCP com o cliente**.
+
+**Conclusão:** no TCP conseguimos observar o servidor aguardando (`LISTENING`) e a conexão aberta (`ESTABLISHED`). No UDP observamos o socket associado à porta, mas não esses estados de conexão.
 
 ---
 

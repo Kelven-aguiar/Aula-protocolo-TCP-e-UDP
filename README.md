@@ -4,7 +4,7 @@ Siga as três atividades na ordem, criando os arquivos no VS Code, testando as c
 
 ## Antes de começar — preparação
 
-**Dividam-se em duplas.** O notebook A será o **servidor** e o notebook B será o **cliente**. Os dois devem estar no mesmo Wi-Fi. Ao final, troquem os papéis.
+**Dividam-se em duplas.** O notebook A será o **servidor** e o notebook B será o **cliente**. Os dois devem estar no mesmo Wi-Fi.
 
 1. Abra o **VS Code**. Em seu computador, crie uma pasta chamada **`Servidor-Cliente-Python`**.
 2. No VS Code, clique em **File → Open Folder** e abra essa pasta.
@@ -14,7 +14,7 @@ Siga as três atividades na ordem, criando os arquivos no VS Code, testando as c
 
 **Conheça as funções:** `socket()` cria o socket; `bind()` define IP/porta locais; `listen()` prepara a espera por conexões TCP; `accept()` aceita um cliente; `connect()` inicia a conexão TCP; `sendall()` envia bytes pelo TCP; `recvfrom()` e `sendto()` recebem e enviam datagramas UDP. O `while True` mantém o programa em funcionamento até sair do laço.
 
-> **Como usar este tutorial:** todos os blocos Python têm **código completo, com indentação**. Nas atualizações, observe os comentários `# NOVO - ATIVIDADE 2` e `# NOVO - ATIVIDADE 3` e **substitua o conteúdo inteiro do arquivo** pelo bloco logo abaixo de **"Ficando assim o código:"**. Dessa maneira, você não precisa adivinhar onde colocar cada linha.
+> **Como usar este tutorial:** todos os blocos Python têm **código completo**. Nas atualizações, observe os comentários `# NOVO - ATIVIDADE 2` e `# NOVO - ATIVIDADE 3` e **substitua o conteúdo inteiro do arquivo** pelo bloco logo abaixo de **"Ficando assim o código:"**. Dessa maneira, você não precisa adivinhar onde colocar cada linha.
 
 ---
 
